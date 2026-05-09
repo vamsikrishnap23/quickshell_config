@@ -17,7 +17,7 @@ Row {
     property var sinkAudio: sink ? sink.audio : null
     property var battery: UPower.displayDevice
 
-    // UI Labels (Using literal glyphs and double spacing)
+    // UI Labels (Literal glyphs and double spacing)
     property string wifiLabel: "󰤭  Offline"
     property string volumeLabelText: "󰖁  --%"
     property string batteryLabelText: "󰁹  --%"
@@ -73,7 +73,6 @@ Row {
         rawVol = rawVol !== undefined ? rawVol : 0
         const pct = Math.min(150, Math.max(0, Math.round(rawVol <= 1.5 ? rawVol * 100 : rawVol)))
         
-        // Changed icons to consistent literal glyphs
         const icon = sinkAudio.muted ? "󰖁" : "󰕾"
         
         let btName = ""
@@ -89,7 +88,6 @@ Row {
             }
         }
         
-        // Standardized double spacing
         volumeLabelText = btName ? `${icon}  ${pct}%  ${btName}` : `${icon}  ${pct}%`
     }
 
@@ -107,8 +105,8 @@ Row {
         
         const charging = battery.state === UPowerDeviceState.Charging || battery.state === UPowerDeviceState.PendingCharge
         
-        // Changed icons to literal glyphs
-        const icon = charging ? "󰂄" : "󰁹"
+        // FontAwesome Thunderbolt icon for charging
+        const icon = charging ? "" : "󰁹"
         
         batteryLabelText = `${icon}  ${pct}%`
     }
@@ -207,4 +205,4 @@ Row {
             onClicked: print("Control Center clicked")
         }
     }
-}1
+}
