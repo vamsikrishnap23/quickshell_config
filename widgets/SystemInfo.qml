@@ -10,16 +10,22 @@ import "../components"
 
 Row {
     id: root
-    anchors.verticalCenter: parent.verticalCenter
     spacing: 10
 
-    property var sink: Pipewire.defaultAudioSink || Pipewire.preferredDefaultAudioSink
+    // Core Properties
+    property var sink: Pipewire.defaultAudioSink || Pipewire.preferredDefaultAudioSink || null
     property var sinkAudio: sink ? sink.audio : null
     property var battery: UPower.displayDevice
 
+    // UI Labels
     property string wifiLabel: "\uf1eb Offline"
     property string volumeLabelText: "\uf028 --%"
     property string batteryLabelText: "\uf240 --%"
+
+    // Pipewire Node Tracker (Required for live volume data)
+    PwObjectTracker {
+        objects: root.sink ? [root.sink] : []
+    }
 
     function updateWifi() {
         const devices = Networking.devices?.values || []
@@ -28,9 +34,8 @@ Row {
             if (device.type === DeviceType.Wifi) {
                 const networks = device.networks?.values || []
                 for (let j = 0; j < networks.length; j++) {
-                    const network = networks[j]
-                    if (network.connected) {
-                        wifiLabel = "\uf1eb " + (network.name || "WiFi")
+                    if (networks[j].connected) {
+                        wifiLabel = "\uf1eb " + (networks[j].name || "WiFi")
                         return
                     }
                 }
@@ -48,33 +53,36 @@ Row {
             volumeLabelText = "\uf028 --%"
             return
         }
-        let raw = sinkAudio.volume
-        if ((raw === 0 || raw === undefined) && sinkAudio.volumes && sinkAudio.volumes.length > 0) {
+
+        let rawVol = sinkAudio.volume
+
+        // Average Left/Right channels if master volume is unavailable
+        if ((rawVol === 0 || rawVol === undefined) && sinkAudio.volumes && sinkAudio.volumes.length > 0) {
             let total = 0
             for (let i = 0; i < sinkAudio.volumes.length; i++) {
                 total += sinkAudio.volumes[i]
             }
-            raw = total / sinkAudio.volumes.length
+            rawVol = total / sinkAudio.volumes.length
         }
-        const normalized = raw <= 1.5 ? raw * 100 : raw
-        const pct = Math.max(0, Math.round(normalized))
+
+        rawVol = rawVol !== undefined ? rawVol : 0
+        const pct = Math.min(150, Math.max(0, Math.round(rawVol <= 1.5 ? rawVol * 100 : rawVol)))
         const icon = sinkAudio.muted ? "\uf6a9" : "\uf028"
         
-        // Find bluetooth device if any
-        let bt = ""
+        let btName = ""
         const bDevices = Bluetooth.devices?.values || []
         for (let i = 0; i < bDevices.length; i++) {
             const bDevice = bDevices[i]
             if (bDevice.connected) {
                 const bIcon = (bDevice.icon || "").toLowerCase()
                 if (bIcon.includes("audio") || bIcon.includes("headset") || bIcon.includes("headphone") || bIcon.includes("speaker")) {
-                    bt = bDevice.deviceName || bDevice.name || "Bluetooth"
+                    btName = bDevice.deviceName || bDevice.name || "Bluetooth"
                     break
                 }
             }
         }
         
-        volumeLabelText = bt ? icon + " " + pct + "% " + bt : icon + " " + pct + "%"
+        volumeLabelText = btName ? `${icon} ${pct}% ${btName}` : `${icon} ${pct}%`
     }
 
     function updateBattery() {
@@ -82,12 +90,14 @@ Row {
             batteryLabelText = "\uf240 --%"
             return
         }
-        const raw = battery.percentage
-        const normalized = raw <= 1.5 ? raw * 100 : raw
-        const pct = Math.max(0, Math.round(normalized))
+        
+        const raw = battery.percentage || 0
+        const pct = Math.max(0, Math.round(raw <= 1.5 ? raw * 100 : raw))
+        
         const charging = battery.state === UPowerDeviceState.Charging || battery.state === UPowerDeviceState.PendingCharge
         const icon = charging ? "\uf0e7" : "\uf240"
-        batteryLabelText = icon + " " + pct + "%"
+        
+        batteryLabelText = `${icon} ${pct}%`
     }
 
     function updateAll() {
@@ -95,9 +105,10 @@ Row {
         updateVolume()
         updateBattery()
     }
-
+    
     Component.onCompleted: updateAll()
 
+    // Signal Listeners
     Connections {
         target: Networking.devices
         function onValuesChanged() { root.updateWifi() }
@@ -107,12 +118,10 @@ Row {
         target: Pipewire
         function onDefaultAudioSinkChanged() { root.updateVolume() }
         function onDefaultConfiguredAudioSinkChanged() { root.updateVolume() }
-        function onReadyChanged() { root.updateVolume() }
     }
 
     Connections {
         target: root.sinkAudio
-        function onVolumesChanged() { root.updateVolume() }
         function onVolumeChanged() { root.updateVolume() }
         function onMutedChanged() { root.updateVolume() }
     }
@@ -130,6 +139,7 @@ Row {
         function onValuesChanged() { root.updateVolume() }
     }
 
+    // UI Rendering
     Pill {
         implicitWidth: wifiText.implicitWidth + 16
         Text {
