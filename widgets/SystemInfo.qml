@@ -202,7 +202,7 @@ Row {
         }
         MouseArea {
             anchors.fill: parent
-            onClicked: print("Control Center clicked")
+            onClicked: GlobalState.showPowermenu = !GlobalState.showPowermenu
         }
     }
 }
