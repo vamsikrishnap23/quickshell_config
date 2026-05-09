@@ -17,16 +17,19 @@ Row {
     property var sinkAudio: sink ? sink.audio : null
     property var battery: UPower.displayDevice
 
-    // UI Labels
-    property string wifiLabel: "\uf1eb Offline"
-    property string volumeLabelText: "\uf028 --%"
-    property string batteryLabelText: "\uf240 --%"
+    // UI Labels (Using literal glyphs and double spacing)
+    property string wifiLabel: "󰤭  Offline"
+    property string volumeLabelText: "󰖁  --%"
+    property string batteryLabelText: "󰁹  --%"
 
-    // Pipewire Node Tracker (Required for live volume data)
+    // Pipewire Node Tracker
     PwObjectTracker {
         objects: root.sink ? [root.sink] : []
     }
 
+    // ==========================================
+    // 1. WIFI LOGIC
+    // ==========================================
     function updateWifi() {
         const devices = Networking.devices?.values || []
         for (let i = 0; i < devices.length; i++) {
@@ -35,28 +38,30 @@ Row {
                 const networks = device.networks?.values || []
                 for (let j = 0; j < networks.length; j++) {
                     if (networks[j].connected) {
-                        wifiLabel = "\uf1eb " + (networks[j].name || "WiFi")
+                        wifiLabel = `󰤨  ${networks[j].name || "WiFi"}`
                         return
                     }
                 }
                 if (device.connected) {
-                    wifiLabel = "\uf1eb WiFi"
+                    wifiLabel = "󰤨  WiFi"
                     return
                 }
             }
         }
-        wifiLabel = "\uf1eb Offline"
+        wifiLabel = "󰤭  Offline"
     }
 
+    // ==========================================
+    // 2. VOLUME LOGIC
+    // ==========================================
     function updateVolume() {
         if (!sinkAudio) {
-            volumeLabelText = "\uf028 --%"
+            volumeLabelText = "󰖁  --%"
             return
         }
 
         let rawVol = sinkAudio.volume
 
-        // Average Left/Right channels if master volume is unavailable
         if ((rawVol === 0 || rawVol === undefined) && sinkAudio.volumes && sinkAudio.volumes.length > 0) {
             let total = 0
             for (let i = 0; i < sinkAudio.volumes.length; i++) {
@@ -67,7 +72,9 @@ Row {
 
         rawVol = rawVol !== undefined ? rawVol : 0
         const pct = Math.min(150, Math.max(0, Math.round(rawVol <= 1.5 ? rawVol * 100 : rawVol)))
-        const icon = sinkAudio.muted ? "\uf6a9" : "\uf028"
+        
+        // Changed icons to consistent literal glyphs
+        const icon = sinkAudio.muted ? "󰖁" : "󰕾"
         
         let btName = ""
         const bDevices = Bluetooth.devices?.values || []
@@ -82,12 +89,16 @@ Row {
             }
         }
         
-        volumeLabelText = btName ? `${icon} ${pct}% ${btName}` : `${icon} ${pct}%`
+        // Standardized double spacing
+        volumeLabelText = btName ? `${icon}  ${pct}%  ${btName}` : `${icon}  ${pct}%`
     }
 
+    // ==========================================
+    // 3. BATTERY LOGIC
+    // ==========================================
     function updateBattery() {
         if (!battery || !battery.ready || !battery.isPresent) {
-            batteryLabelText = "\uf240 --%"
+            batteryLabelText = "󰁹  --%"
             return
         }
         
@@ -95,9 +106,11 @@ Row {
         const pct = Math.max(0, Math.round(raw <= 1.5 ? raw * 100 : raw))
         
         const charging = battery.state === UPowerDeviceState.Charging || battery.state === UPowerDeviceState.PendingCharge
-        const icon = charging ? "\uf0e7" : "\uf240"
         
-        batteryLabelText = `${icon} ${pct}%`
+        // Changed icons to literal glyphs
+        const icon = charging ? "󰂄" : "󰁹"
+        
+        batteryLabelText = `${icon}  ${pct}%`
     }
 
     function updateAll() {
@@ -108,7 +121,9 @@ Row {
     
     Component.onCompleted: updateAll()
 
-    // Signal Listeners
+    // ==========================================
+    // SIGNAL LISTENERS
+    // ==========================================
     Connections {
         target: Networking.devices
         function onValuesChanged() { root.updateWifi() }
@@ -139,7 +154,9 @@ Row {
         function onValuesChanged() { root.updateVolume() }
     }
 
-    // UI Rendering
+    // ==========================================
+    // UI RENDERING
+    // ==========================================
     Pill {
         implicitWidth: wifiText.implicitWidth + 16
         Text {
@@ -190,4 +207,4 @@ Row {
             onClicked: print("Control Center clicked")
         }
     }
-}
+}1
