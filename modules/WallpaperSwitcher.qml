@@ -74,21 +74,22 @@ PanelWindow {
 
     Process { id: swwwProcess }
 
+    Process { id: reloadSwayncProcess; command: ["swaync-client", "-rs"] }
+
     Process {
         id: matugenProcess
         property string jsonBuffer: ""
 
         stdout: SplitParser {
             onRead: data => {
-                matugenProcess.jsonBuffer += data
+                matugenProcess.jsonBuffer += data + "\n"
             }
         }
         
         onExited: {
             try {
                 const parsed = JSON.parse(matugenProcess.jsonBuffer)
-                // NEW: Just hand the entire color object to the Theme! 
-                // The declarative bindings in Theme.qml will do the rest instantly.
+                reloadSwayncProcess.running = true
                 Theme.palette = parsed.colors 
             } catch (e) {
                 console.log("Matugen JSON Parse Error: " + e)
@@ -117,7 +118,7 @@ PanelWindow {
         
         matugenProcess.command = [
             "sh", "-c", 
-            "matugen image '" + fullPath + "' --dry-run -j hex --prefer saturation 2>&1"
+            "matugen image '" + fullPath + "' -j hex --prefer saturation 2>&1"
         ]
         matugenProcess.running = true
 

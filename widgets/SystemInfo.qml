@@ -422,6 +422,7 @@ Row {
             cursorShape: Qt.PointingHandCursor
             onClicked: {
                 // Opens the SwayNC side panel
+                notifToggleProcess.running = false
                 notifToggleProcess.command = ["swaync-client", "-t"]
                 notifToggleProcess.running = true
             }

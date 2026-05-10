@@ -11,6 +11,7 @@ ShellRoot {
     ControlCenter{}
     WallpaperSwitcher {}
 
+
     IpcHandler {
         target: "powermenu"
 

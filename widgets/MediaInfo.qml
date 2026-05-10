@@ -4,11 +4,12 @@ import Quickshell
 import Quickshell.Services.Mpris
 
 import "../styles"
+import "../components" // 1. Import your custom components
 
-Item {
+Pill { // 2. Change the root element from Item to Pill
     id: root
     
-    // 1. Identify the current player
+    // Identify the current player
     property var currentPlayer: {
         const players = Mpris.players.values || []
 
@@ -21,17 +22,16 @@ Item {
         return players.length > 0 ? players[0] : null
     }
 
-    // 2. Track the active playing state
+    // Track the active playing state
     property bool isPlaying: currentPlayer && currentPlayer.playbackState === MprisPlaybackState.Playing
 
-    // 3. Keep visible as long as ANY player exists, even if paused
+    // Keep visible as long as ANY player exists, even if paused
     visible: currentPlayer !== null
     
-    // 4. Define dimensions without the Pill background
-    implicitWidth: Math.min(350, Math.max(200, mediaText.implicitWidth))
-    implicitHeight: 32
+    // 3. Add padding to the width calculation so text doesn't touch the Pill edges
+    implicitWidth: Math.min(350, Math.max(200, mediaText.implicitWidth + 32))
 
-    // 5. Interactive play/pause controls
+    // Interactive play/pause controls
     MouseArea {
         anchors.fill: parent
         cursorShape: Qt.PointingHandCursor
@@ -64,9 +64,10 @@ Item {
         font.pixelSize: 12
         font.family: "JetBrainsMono Nerd Font"
         
-        // Prevent text from overflowing its container
+        // 4. Force text to elide inside the Pill with proper margins and centering
         elide: Text.ElideRight
-        width: parent.width
+        width: parent.width - 24 
+        horizontalAlignment: Text.AlignHCenter
         
         // Smooth color transition
         Behavior on color {
