@@ -6,4 +6,5 @@ LeftSection 1.0 LeftSection.qml
 MediaInfo 1.0 MediaInfo.qml
 SystemInfo 1.0 SystemInfo.qml
 Time 1.0 Time.qml
+DatePill 1.0 DatePill.qml
 Workspaces 1.0 Workspaces.qml

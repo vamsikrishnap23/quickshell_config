@@ -10,4 +10,6 @@ Row {
     Workspaces {}
 
     Time {}
+
+    DatePill {} 
 }

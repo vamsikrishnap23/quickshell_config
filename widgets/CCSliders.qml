@@ -13,7 +13,7 @@ Column {
 
     property int brightnessValue: 80
 
-    // Fetch brightness when Control Center opens
+    // Fetch brightness when Control Center opens to guarantee sync
     Connections {
         target: GlobalState
         function onShowControlCenterChanged() {
@@ -21,17 +21,38 @@ Column {
         }
     }
 
+    // 1. Fetch current brightness
     Process {
         id: brightnessProcess
         command: ["sh", "-c", "brightnessctl -m | cut -d',' -f4 | tr -d '%'"]
         stdout: SplitParser {
             onRead: data => {
                 const value = parseInt(data)
-                if (!isNaN(value)) root.brightnessValue = value
+                // Only apply external changes if the user isn't actively dragging the slider
+                if (!isNaN(value) && !brightnessMouseArea.pressed) {
+                    root.brightnessValue = value
+                }
             }
         }
     }
-    
+
+    // 2. Zero-polling hardware event watcher
+    Process {
+        id: backlightWatcher
+        // Listens to kernel backlight events and outputs a line on change
+        command: ["udevadm", "monitor", "--subsystem-match=backlight"]
+        running: true
+        stdout: SplitParser {
+            onRead: data => {
+                // Trigger a fetch whenever a hardware key changes the brightness
+                brightnessProcess.running = true
+            }
+        }
+    }
+
+    // Initial fetch on load
+    Component.onCompleted: brightnessProcess.running = true
+
     Process { id: brightnessSetProcess }
 
     // Brightness Slider
@@ -71,6 +92,7 @@ Column {
             }
 
             MouseArea {
+                id: brightnessMouseArea
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
                 

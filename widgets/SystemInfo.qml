@@ -5,6 +5,7 @@ import Quickshell.Networking
 import Quickshell.Services.UPower
 import Quickshell.Services.Pipewire
 import Quickshell.Bluetooth
+import Quickshell.Io
 
 import "../styles"
 import "../components"
@@ -19,6 +20,7 @@ Row {
     property var sinkAudio: sink ? sink.audio : null
     property var battery: UPower.displayDevice
     property bool applyingBluetoothSnap: false
+    property string connectedBluetoothAudioName: ""
     property bool notificationsPresent: false
     property bool notificationsDnd: false
 
@@ -68,7 +70,7 @@ Row {
         return raw <= 1.5 ? raw : raw / 100
     }
 
-    function currentSinkVolumeNormalized() {
+    function effectiveVolume() {
         if (!sinkAudio) {
             return 0
         }
@@ -86,7 +88,38 @@ Row {
             rawVol = total / sinkAudio.volumes.length
         }
 
-        return Math.max(0, normalizedVolume(rawVol))
+        return rawVol !== undefined ? rawVol : 0
+    }
+
+    function currentSinkVolumeNormalized() {
+        return Math.max(0, normalizedVolume(effectiveVolume()))
+    }
+
+    function refreshConnectedBluetoothAudioName() {
+        let nextName = ""
+        const bDevices = Bluetooth.devices?.values || []
+        for (let i = 0; i < bDevices.length; i++) {
+            const bDevice = bDevices[i]
+            if (!bDevice.connected) {
+                continue
+            }
+
+            const bIcon = (bDevice.icon || "").toLowerCase()
+            if (
+                bIcon.includes("audio")
+                || bIcon.includes("headset")
+                || bIcon.includes("headphone")
+                || bIcon.includes("speaker")
+            ) {
+                nextName = bDevice.deviceName || bDevice.name || "Bluetooth"
+                break
+            }
+        }
+
+        if (connectedBluetoothAudioName !== nextName) {
+            connectedBluetoothAudioName = nextName
+            updateVolumeLabel()
+        }
     }
 
     function maybeSnapBluetoothVolumeTo5Percent() {
@@ -95,7 +128,7 @@ Row {
         }
 
         // Only snap when an audio Bluetooth device is currently connected.
-        if (!connectedBluetoothAudioName()) {
+        if (!connectedBluetoothAudioName) {
             return
         }
 
@@ -118,51 +151,16 @@ Row {
         return Pipewire.defaultAudioSink || Pipewire.preferredDefaultAudioSink || null
     }
 
-    function connectedBluetoothAudioName() {
-        const bDevices = Bluetooth.devices?.values || []
-        for (let i = 0; i < bDevices.length; i++) {
-            const bDevice = bDevices[i]
-            if (!bDevice.connected) {
-                continue
-            }
-
-            const bIcon = (bDevice.icon || "").toLowerCase()
-            if (
-                bIcon.includes("audio")
-                || bIcon.includes("headset")
-                || bIcon.includes("headphone")
-                || bIcon.includes("speaker")
-            ) {
-                return bDevice.deviceName || bDevice.name || "Bluetooth"
-            }
-        }
-
-        return ""
-    }
-
     function updateVolumeLabel() {
         if (!sinkAudio) {
             volumeLabelText = "󰖁  --%"
             return
         }
 
-        let rawVol = sinkAudio.volume
-        if (
-            (rawVol === 0 || rawVol === undefined)
-            && sinkAudio.volumes
-            && sinkAudio.volumes.length > 0
-        ) {
-            let total = 0
-            for (let i = 0; i < sinkAudio.volumes.length; i++) {
-                total += sinkAudio.volumes[i]
-            }
-            rawVol = total / sinkAudio.volumes.length
-        }
-
-        rawVol = rawVol !== undefined ? rawVol : 0
-        const pct = Math.min(150, Math.max(0, Math.round(rawVol <= 1.5 ? rawVol * 100 : rawVol)))
+        const volume = normalizedVolume(effectiveVolume())
+        const pct = Math.min(150, Math.max(0, Math.round(volume * 100)))
         const icon = volumeIconForPercent(pct, sinkAudio.muted)
-        const btName = connectedBluetoothAudioName()
+        const btName = connectedBluetoothAudioName
 
         volumeLabelText = btName
             ? `${icon}  ${pct}%  ${btName}`
@@ -241,20 +239,22 @@ Row {
                 ignoreUnknownSignals: true
 
                 function onConnectedChanged() {
-                    root.updateVolumeLabel()
+                    root.refreshConnectedBluetoothAudioName()
                 }
 
                 function onDeviceNameChanged() {
-                    root.updateVolumeLabel()
+                    root.refreshConnectedBluetoothAudioName()
                 }
 
                 function onNameChanged() {
-                    root.updateVolumeLabel()
+                    root.refreshConnectedBluetoothAudioName()
                 }
 
                 function onIconChanged() {
-                    root.updateVolumeLabel()
+                    root.refreshConnectedBluetoothAudioName()
                 }
+
+                Component.onDestruction: root.refreshConnectedBluetoothAudioName()
             }
         }
     }
@@ -262,12 +262,10 @@ Row {
     Component.onCompleted: {
         sink = resolveDefaultSink()
         sinkAudio = sink ? sink.audio : null
+        refreshConnectedBluetoothAudioName()
         updateVolumeLabel()
     }
 
-    // ==========================================
-    // 1. WIFI (Declarative Watcher)
-    // ==========================================
     // ==========================================
     // 1. WIFI (Event-Driven & Optimized)
     // ==========================================
@@ -285,7 +283,7 @@ Row {
             delegate: QtObject {
                 id: netWatcher
                 
-                // 1. Reactive bindings: These update automatically without timers
+                // 1. Reactive bindings
                 property bool isConnected: modelData.connected
                 property string netName: modelData.name
                 property int signalPct: root.normalizedPercent(
@@ -294,22 +292,36 @@ Row {
                     (modelData.signal !== undefined ? modelData.signal : 100))
                 )
 
+                // MEMORY: Track the name used when this specifically connected
+                property string activeName: ""
+
                 // 2. State synchronization function
                 function syncState() {
                     if (isConnected) {
-                        root.wifiLabel = `${root.wifiIconForPercent(signalPct)}  ${netName || "WiFi"}`
-                    } else if (root.wifiLabel.endsWith(`  ${netName || "WiFi"}`)) {
+                        activeName = netName || "WiFi"
+                        root.wifiLabel = `${root.wifiIconForPercent(signalPct)}  ${activeName}`
+                    } else if (activeName !== "") {
                         // Only set to offline if THIS network was the one previously connected
-                        root.wifiLabel = "󰤭  Offline"
+                        if (root.wifiLabel.endsWith(`  ${activeName}`)) {
+                            root.wifiLabel = "󰤭  Offline"
+                        }
+                        activeName = "" // Clear memory
                     }
                 }
 
-                // 3. Signal listeners trigger updates instantly, only when needed
+                // 3. Signal listeners
                 onIsConnectedChanged: syncState()
                 onNetNameChanged: syncState()
                 onSignalPctChanged: syncState()
 
                 Component.onCompleted: syncState()
+
+                // SAFETY: Catch when the Wi-Fi radio is toggled off and the network is destroyed
+                Component.onDestruction: {
+                    if (activeName !== "" && root.wifiLabel.endsWith(`  ${activeName}`)) {
+                        root.wifiLabel = "󰤭  Offline"
+                    }
+                }
             }
         }
     }
@@ -390,6 +402,11 @@ Row {
         }
     }
 
+    // 4. Notification Panel Toggle Process
+    Process {
+        id: notifToggleProcess
+    }
+
     Pill {
         implicitWidth: 32
         Text {
@@ -399,9 +416,15 @@ Row {
             font.pixelSize: 14
             font.family: "JetBrainsMono Nerd Font"
         }
+        
+        MouseArea {
+            anchors.fill: parent
+            cursorShape: Qt.PointingHandCursor
+            onClicked: {
+                // Opens the SwayNC side panel
+                notifToggleProcess.command = ["swaync-client", "-t"]
+                notifToggleProcess.running = true
+            }
+        }
     }
-
-    
-
-    
 }
