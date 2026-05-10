@@ -3,20 +3,25 @@ pragma Singleton
 import QtQuick
 
 QtObject {
+
     // =========================
     // COLORS
     // =========================
 
-    readonly property color background: "#11111bee"
-    readonly property color surface: "#1e1e2ecc"
+    // Main backgrounds
+    readonly property color background: "#111111"
+    readonly property color surface: "#1c1c1f"
 
+    // Accent colors
     readonly property color primary: "#cba6f7"
     readonly property color secondary: "#89b4fa"
 
-    readonly property color text: "#f5e0dc"
-    readonly property color textDim: "#a6adc8"
+    // Text
+    readonly property color text: "#ffffff"
+    readonly property color textDim: "#a1a1aa"
 
-    readonly property color border: "#313244"
+    // Borders
+    readonly property color border: "#2a2a2e"
 
     // =========================
     // SIZING
@@ -30,7 +35,7 @@ QtObject {
     // BAR
     // =========================
 
-    readonly property int barHeight: 42
+    readonly property int barHeight: 38
 
     // =========================
     // ANIMATIONS
