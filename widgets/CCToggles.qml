@@ -10,8 +10,8 @@ Row {
 
     property bool toggleWifi: true
     property bool toggleBt: true
-    property bool togglePower: false
     property bool toggleDnd: false
+
 
     // 2. Fetch the actual Wi-Fi state on widget load
     Process {
@@ -124,40 +124,6 @@ Row {
                 btToggleProcess.command = ["bluetoothctl", "power", toggleBt ? "on" : "off"]
                 btToggleProcess.running = true
             }
-        }
-    }
-
-    // Power Profile
-    Rectangle {
-        width: (parent.width - 36) / 4
-        height: 70
-        radius: 18
-        color: togglePower ? Theme.primary : Theme.surface
-        border.color: togglePower ? Theme.primary : Theme.border
-        border.width: 1
-
-        Column {
-            anchors.centerIn: parent
-            spacing: 4
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: "󰚥"
-                color: togglePower ? "#111111" : Theme.text
-                font.pixelSize: 24
-                font.family: "JetBrainsMono Nerd Font"
-            }
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: togglePower ? "Perform" : "Auto"
-                color: togglePower ? "#111111" : Theme.textDim
-                font.pixelSize: 11
-                font.bold: togglePower
-            }
-        }
-        MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.PointingHandCursor
-            onClicked: togglePower = !togglePower
         }
     }
 
