@@ -1,4 +1,5 @@
 import QtQuick
+import QtQml
 import QtQuick.Controls
 import Quickshell.Networking
 import Quickshell.Services.UPower
@@ -17,48 +18,44 @@ Row {
     property var sinkAudio: sink ? sink.audio : null
     property var battery: UPower.displayDevice
 
-    // UI Labels (Literal glyphs and double spacing)
-    property string wifiLabel: "󰤭  Offline"
-    property string volumeLabelText: "󰖁  --%"
-    property string batteryLabelText: "󰁹  --%"
-
     // Pipewire Node Tracker
     PwObjectTracker {
         objects: root.sink ? [root.sink] : []
     }
 
     // ==========================================
-    // 1. WIFI LOGIC
+    // 1. WIFI (Declarative Watcher)
     // ==========================================
-    function updateWifi() {
-        const devices = Networking.devices?.values || []
-        for (let i = 0; i < devices.length; i++) {
-            const device = devices[i]
-            if (device.type === DeviceType.Wifi) {
-                const networks = device.networks?.values || []
-                for (let j = 0; j < networks.length; j++) {
-                    if (networks[j].connected) {
-                        wifiLabel = `󰤨  ${networks[j].name || "WiFi"}`
-                        return
+    property string wifiLabel: "󰤭  Offline"
+
+    Instantiator {
+        model: Networking.devices
+        delegate: Instantiator {
+            active: modelData.type === DeviceType.Wifi
+            model: active ? modelData.networks : null
+            delegate: QtObject {
+                property bool isConnected: modelData.connected
+                property string netName: modelData.name
+
+                onIsConnectedChanged: {
+                    if (isConnected) {
+                        root.wifiLabel = `󰤨  ${netName || "WiFi"}`
+                    } else if (root.wifiLabel === `󰤨  ${netName || "WiFi"}`) {
+                        root.wifiLabel = "󰤭  Offline"
                     }
                 }
-                if (device.connected) {
-                    wifiLabel = "󰤨  WiFi"
-                    return
+                Component.onCompleted: {
+                    if (isConnected) root.wifiLabel = `󰤨  ${netName || "WiFi"}`
                 }
             }
         }
-        wifiLabel = "󰤭  Offline"
     }
 
     // ==========================================
-    // 2. VOLUME LOGIC
+    // 2. VOLUME (Declarative Binding)
     // ==========================================
-    function updateVolume() {
-        if (!sinkAudio) {
-            volumeLabelText = "󰖁  --%"
-            return
-        }
+    property string volumeLabelText: {
+        if (!sinkAudio) return "󰖁  --%"
 
         let rawVol = sinkAudio.volume
 
@@ -72,7 +69,6 @@ Row {
 
         rawVol = rawVol !== undefined ? rawVol : 0
         const pct = Math.min(150, Math.max(0, Math.round(rawVol <= 1.5 ? rawVol * 100 : rawVol)))
-        
         const icon = sinkAudio.muted ? "󰖁" : "󰕾"
         
         let btName = ""
@@ -88,68 +84,21 @@ Row {
             }
         }
         
-        volumeLabelText = btName ? `${icon}  ${pct}%  ${btName}` : `${icon}  ${pct}%`
+        return btName ? `${icon}  ${pct}%  ${btName}` : `${icon}  ${pct}%`
     }
 
     // ==========================================
-    // 3. BATTERY LOGIC
+    // 3. BATTERY (Declarative Binding)
     // ==========================================
-    function updateBattery() {
-        if (!battery || !battery.ready || !battery.isPresent) {
-            batteryLabelText = "󰁹  --%"
-            return
-        }
+    property string batteryLabelText: {
+        if (!battery || !battery.ready || !battery.isPresent) return "󰁹  --%"
         
         const raw = battery.percentage || 0
         const pct = Math.max(0, Math.round(raw <= 1.5 ? raw * 100 : raw))
-        
         const charging = battery.state === UPowerDeviceState.Charging || battery.state === UPowerDeviceState.PendingCharge
-        
-        // FontAwesome Thunderbolt icon for charging
         const icon = charging ? "" : "󰁹"
         
-        batteryLabelText = `${icon}  ${pct}%`
-    }
-
-    function updateAll() {
-        updateWifi()
-        updateVolume()
-        updateBattery()
-    }
-    
-    Component.onCompleted: updateAll()
-
-    // ==========================================
-    // SIGNAL LISTENERS
-    // ==========================================
-    Connections {
-        target: Networking.devices
-        function onValuesChanged() { root.updateWifi() }
-    }
-
-    Connections {
-        target: Pipewire
-        function onDefaultAudioSinkChanged() { root.updateVolume() }
-        function onDefaultConfiguredAudioSinkChanged() { root.updateVolume() }
-    }
-
-    Connections {
-        target: root.sinkAudio
-        function onVolumeChanged() { root.updateVolume() }
-        function onMutedChanged() { root.updateVolume() }
-    }
-
-    Connections {
-        target: root.battery
-        function onPercentageChanged() { root.updateBattery() }
-        function onStateChanged() { root.updateBattery() }
-        function onReadyChanged() { root.updateBattery() }
-        function onIsPresentChanged() { root.updateBattery() }
-    }
-
-    Connections {
-        target: Bluetooth.devices
-        function onValuesChanged() { root.updateVolume() }
+        return `${icon}  ${pct}%`
     }
 
     // ==========================================

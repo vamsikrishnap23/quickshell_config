@@ -21,7 +21,7 @@ Pill {
     Timer {
         running: true
         repeat: true
-        interval: 1000
+        interval: 5000
 
         onTriggered: {
             timeText.text = Qt.formatTime(new Date(), "hh:mm")
