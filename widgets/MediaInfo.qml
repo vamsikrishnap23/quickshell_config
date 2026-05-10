@@ -28,9 +28,9 @@ Item {
     visible: currentPlayer !== null
     
     // 4. Define dimensions without the Pill background
-    implicitWidth: Math.max(200, mediaText.implicitWidth)
-    implicitHeight: 32 // Maintains vertical alignment with the TopBar
-    
+    implicitWidth: Math.min(350, Math.max(200, mediaText.implicitWidth))
+    implicitHeight: 32
+
     // 5. Interactive play/pause controls
     MouseArea {
         anchors.fill: parent
