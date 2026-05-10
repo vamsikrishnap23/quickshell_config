@@ -18,6 +18,45 @@ Row {
     property var sinkAudio: sink ? sink.audio : null
     property var battery: UPower.displayDevice
     property bool applyingBluetoothSnap: false
+    property bool notificationsPresent: false
+    property bool notificationsDnd: false
+
+    function normalizedPercent(raw) {
+        if (raw === undefined || raw === null) {
+            return 0
+        }
+        const value = raw <= 1.5 ? raw * 100 : raw
+        return Math.max(0, Math.min(100, Math.round(value)))
+    }
+
+    function wifiIconForPercent(pct) {
+        if (pct <= 0) return "󰤭"
+        if (pct <= 24) return "󰤟"
+        if (pct <= 49) return "󰤢"
+        if (pct <= 74) return "󰤥"
+        return "󰤨"
+    }
+
+    function volumeIconForPercent(pct, muted) {
+        if (muted || pct <= 0) return "󰖁"
+        if (pct <= 33) return "󰕿"
+        if (pct <= 66) return "󰖀"
+        return "󰕾"
+    }
+
+    function batteryIconForPercent(pct) {
+        if (pct <= 10) return ""
+        if (pct <= 30) return ""
+        if (pct <= 55) return ""
+        if (pct <= 80) return ""
+        return ""
+    }
+
+    function notificationIconForState(hasNotifications, dnd) {
+        if (dnd) return "\uec08"
+        if (hasNotifications) return "\ueb9a"
+        return "\ueaa2"
+    }
 
     function normalizedVolume(raw) {
         if (raw === undefined || raw === null) {
@@ -118,11 +157,8 @@ Row {
         }
 
         rawVol = rawVol !== undefined ? rawVol : 0
-        const pct = Math.min(
-            150,
-            Math.max(0, Math.round(rawVol <= 1.5 ? rawVol * 100 : rawVol))
-        )
-        const icon = sinkAudio.muted ? "󰖁" : "󰕾"
+        const pct = Math.min(150, Math.max(0, Math.round(rawVol <= 1.5 ? rawVol * 100 : rawVol)))
+        const icon = volumeIconForPercent(pct, sinkAudio.muted)
         const btName = connectedBluetoothAudioName()
 
         volumeLabelText = btName
@@ -236,19 +272,70 @@ Row {
         delegate: Instantiator {
             active: modelData.type === DeviceType.Wifi
             model: active ? modelData.networks : null
-            delegate: QtObject {
+            delegate: Item {
                 property bool isConnected: modelData.connected
                 property string netName: modelData.name
+                property int signalPct: root.normalizedPercent(
+                    modelData.strength !== undefined
+                        ? modelData.strength
+                        : (modelData.signalStrength !== undefined
+                            ? modelData.signalStrength
+                            : (modelData.signal !== undefined ? modelData.signal : 100))
+                )
+
+                width: 0
+                height: 0
+                visible: false
 
                 onIsConnectedChanged: {
                     if (isConnected) {
-                        root.wifiLabel = `󰤨  ${netName || "WiFi"}`
-                    } else if (root.wifiLabel === `󰤨  ${netName || "WiFi"}`) {
+                        root.wifiLabel = `${root.wifiIconForPercent(signalPct)}  ${netName || "WiFi"}`
+                    } else if (root.wifiLabel.endsWith(`  ${netName || "WiFi"}`)) {
                         root.wifiLabel = "󰤭  Offline"
                     }
                 }
+
+                onNetNameChanged: {
+                    if (isConnected) {
+                        root.wifiLabel = `${root.wifiIconForPercent(signalPct)}  ${netName || "WiFi"}`
+                    }
+                }
+
+                onSignalPctChanged: {
+                    if (isConnected) {
+                        root.wifiLabel = `${root.wifiIconForPercent(signalPct)}  ${netName || "WiFi"}`
+                    }
+                }
+
+                Connections {
+                    target: modelData
+                    ignoreUnknownSignals: true
+
+                    function onConnectedChanged() {
+                        isConnected = modelData.connected
+                    }
+
+                    function onNameChanged() {
+                        netName = modelData.name
+                    }
+
+                    function onStrengthChanged() {
+                        signalPct = root.normalizedPercent(modelData.strength)
+                    }
+
+                    function onSignalStrengthChanged() {
+                        signalPct = root.normalizedPercent(modelData.signalStrength)
+                    }
+
+                    function onSignalChanged() {
+                        signalPct = root.normalizedPercent(modelData.signal)
+                    }
+                }
+
                 Component.onCompleted: {
-                    if (isConnected) root.wifiLabel = `󰤨  ${netName || "WiFi"}`
+                    if (isConnected) {
+                        root.wifiLabel = `${root.wifiIconForPercent(signalPct)}  ${netName || "WiFi"}`
+                    }
                 }
             }
         }
@@ -266,9 +353,9 @@ Row {
         if (!battery || !battery.ready || !battery.isPresent) return "󰁹  --%"
         
         const raw = battery.percentage || 0
-        const pct = Math.max(0, Math.round(raw <= 1.5 ? raw * 100 : raw))
+        const pct = normalizedPercent(raw)
         const charging = battery.state === UPowerDeviceState.Charging || battery.state === UPowerDeviceState.PendingCharge
-        const icon = charging ? "" : "󰁹"
+        const icon = charging ? "" : batteryIconForPercent(pct)
         
         return `${icon}  ${pct}%`
     }
@@ -316,14 +403,10 @@ Row {
         implicitWidth: 32
         Text {
             anchors.centerIn: parent
-            text: "󰣇"
+            text: root.notificationIconForState(root.notificationsPresent, root.notificationsDnd)
             color: Theme.text
             font.pixelSize: 14
             font.family: "JetBrainsMono Nerd Font"
-        }
-        MouseArea {
-            anchors.fill: parent
-            onClicked: GlobalState.showPowermenu = !GlobalState.showPowermenu
         }
     }
 }

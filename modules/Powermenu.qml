@@ -4,9 +4,19 @@ import Quickshell
 import Quickshell.Io
 
 import "../styles"
+import "../state"
 import "../components"
 
 PanelWindow {
+    id: root
+    
+    // System commands
+    Process { id: cmdShutdown; command: ["systemctl", "poweroff"] }
+    Process { id: cmdReboot; command: ["systemctl", "reboot"] }
+    Process { id: cmdLogout; command: ["hyprctl", "dispatch", "exit"] }
+    Process { id: cmdLock; command: ["hyprlock"] }
+    Process { id: cmdSleep; command: ["systemctl", "suspend"] }
+    
     // Force the window to cover the entire screen
     anchors {
         top: true; bottom: true
@@ -19,64 +29,248 @@ PanelWindow {
     // Listen to our global state
     visible: GlobalState.showPowermenu
 
-    // ------------------------------------------
-    // SYSTEM COMMANDS
-    // ------------------------------------------
-    Process { id: cmdShutdown; command: ["systemctl", "poweroff"] }
-    Process { id: cmdReboot; command: ["systemctl", "reboot"] }
-    Process { id: cmdLogout; command: ["hyprctl", "dispatch", "exit"] }
+    // Handle Escape key to close menu
+    Keys.onEscapePressed: {
+        GlobalState.showPowermenu = false
+    }
 
-    // ------------------------------------------
-    // UI LAYOUT
-    // ------------------------------------------
-    
     // Clicking anywhere in the background closes the menu
     MouseArea {
         anchors.fill: parent
         onClicked: GlobalState.showPowermenu = false
     }
 
-    Row {
-        anchors.centerIn: parent
-        spacing: 30
+    Column {
+        id: menuContainer
+        anchors.right: parent.right
+        anchors.rightMargin: 30
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: 0
 
-        // Shutdown Button
-        Pill {
-            implicitWidth: 120; implicitHeight: 120
-            Text { 
-                anchors.centerIn: parent; text: "󰐥"
-                color: Theme.primary; font.pixelSize: 48; font.family: "JetBrainsMono Nerd Font" 
-            }
-            MouseArea {
-                anchors.fill: parent
-                onClicked: cmdShutdown.running = true
+        // Slide in animation
+        Behavior on x {
+            NumberAnimation {
+                duration: Theme.normalAnim
+                easing.type: Easing.OutCubic
             }
         }
 
-        // Reboot Button
-        Pill {
-            implicitWidth: 120; implicitHeight: 120
-            Text { 
-                anchors.centerIn: parent; text: "󰑓"
-                color: Theme.text; font.pixelSize: 48; font.family: "JetBrainsMono Nerd Font" 
-            }
-            MouseArea {
-                anchors.fill: parent
-                onClicked: cmdReboot.running = true
-            }
+        x: GlobalState.showPowermenu ? 0 : 120
+        opacity: GlobalState.showPowermenu ? 1 : 0
+
+        Behavior on opacity {
+            NumberAnimation { duration: Theme.normalAnim }
         }
 
-        // Logout Button
-        Pill {
-            implicitWidth: 120; implicitHeight: 120
-            Text { 
-                anchors.centerIn: parent; text: "󰍃"
-                color: Theme.text; font.pixelSize: 48; font.family: "JetBrainsMono Nerd Font" 
-            }
-            MouseArea {
+        // Dark pill background
+        Rectangle {
+            id: pillBackground
+            width: 90
+            height: 390
+            radius: 45
+            color: Theme.background
+            border.color: Theme.border
+            border.width: 1
+
+            Column {
                 anchors.fill: parent
-                onClicked: cmdLogout.running = true
+                anchors.topMargin: 15
+                anchors.bottomMargin: 15
+                spacing: 0
+
+                // Lock Button
+                Rectangle {
+                    width: 60
+                    height: 60
+                    radius: 30
+                    color: root.lockHover ? Theme.primary : Theme.surface
+                    border.color: root.lockHover ? Theme.primary : Theme.border
+                    border.width: 1.5
+                    anchors.horizontalCenter: parent.horizontalCenter
+
+                    Behavior on color { ColorAnimation { duration: Theme.fastAnim } }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "󰌾"
+                        color: root.lockHover ? Qt.rgba(0, 0, 0, 1) : Theme.text
+                        font.pixelSize: 28
+                        font.family: "JetBrainsMono Nerd Font"
+                        Behavior on color { ColorAnimation { duration: Theme.fastAnim } }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: cmdLock.running = true
+                        onEntered: root.lockHover = true
+                        onExited: root.lockHover = false
+                        cursorShape: Qt.PointingHandCursor
+                    }
+
+                    ToolTip.visible: root.lockHover
+                    ToolTip.text: "Lock"
+                    ToolTip.delay: 300
+                }
+
+                Item { width: 1; height: 8 }
+
+                // Sleep Button
+                Rectangle {
+                    width: 60
+                    height: 60
+                    radius: 30
+                    color: root.sleepHover ? Theme.primary : Theme.surface
+                    border.color: root.sleepHover ? Theme.primary : Theme.border
+                    border.width: 1.5
+                    anchors.horizontalCenter: parent.horizontalCenter
+
+                    Behavior on color { ColorAnimation { duration: Theme.fastAnim } }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: ""
+                        color: root.sleepHover ? Qt.rgba(0, 0, 0, 1) : Theme.text
+                        font.pixelSize: 28
+                        font.family: "JetBrainsMono Nerd Font"
+                        Behavior on color { ColorAnimation { duration: Theme.fastAnim } }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: cmdSleep.running = true
+                        onEntered: root.sleepHover = true
+                        onExited: root.sleepHover = false
+                        cursorShape: Qt.PointingHandCursor
+                    }
+
+                    ToolTip.visible: root.sleepHover
+                    ToolTip.text: "Sleep"
+                    ToolTip.delay: 300
+                }
+
+                Item { width: 1; height: 8 }
+
+                // Logout Button
+                Rectangle {
+                    width: 60
+                    height: 60
+                    radius: 30
+                    color: root.logoutHover ? Theme.primary : Theme.surface
+                    border.color: root.logoutHover ? Theme.primary : Theme.border
+                    border.width: 1.5
+                    anchors.horizontalCenter: parent.horizontalCenter
+
+                    Behavior on color { ColorAnimation { duration: Theme.fastAnim } }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "󰍃"
+                        color: root.logoutHover ? Qt.rgba(0, 0, 0, 1) : Theme.text
+                        font.pixelSize: 28
+                        font.family: "JetBrainsMono Nerd Font"
+                        Behavior on color { ColorAnimation { duration: Theme.fastAnim } }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: cmdLogout.running = true
+                        onEntered: root.logoutHover = true
+                        onExited: root.logoutHover = false
+                        cursorShape: Qt.PointingHandCursor
+                    }
+
+                    ToolTip.visible: root.logoutHover
+                    ToolTip.text: "Logout"
+                    ToolTip.delay: 300
+                }
+
+                Item { width: 1; height: 8 }
+
+                // Reboot Button
+                Rectangle {
+                    width: 60
+                    height: 60
+                    radius: 30
+                    color: root.rebootHover ? Theme.primary : Theme.surface
+                    border.color: root.rebootHover ? Theme.primary : Theme.border
+                    border.width: 1.5
+                    anchors.horizontalCenter: parent.horizontalCenter
+
+                    Behavior on color { ColorAnimation { duration: Theme.fastAnim } }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "󰜉"
+                        color: root.rebootHover ? Qt.rgba(0, 0, 0, 1) : Theme.text
+                        font.pixelSize: 28
+                        font.family: "JetBrainsMono Nerd Font"
+                        Behavior on color { ColorAnimation { duration: Theme.fastAnim } }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: cmdReboot.running = true
+                        onEntered: root.rebootHover = true
+                        onExited: root.rebootHover = false
+                        cursorShape: Qt.PointingHandCursor
+                    }
+
+                    ToolTip.visible: root.rebootHover
+                    ToolTip.text: "Reboot"
+                    ToolTip.delay: 300
+                }
+
+                Item { width: 1; height: 8 }
+
+                // Shutdown Button
+                Rectangle {
+                    width: 60
+                    height: 60
+                    radius: 30
+                    color: root.shutdownHover ? Theme.primary : Theme.surface
+                    border.color: root.shutdownHover ? Theme.primary : Theme.border
+                    border.width: 1.5
+                    anchors.horizontalCenter: parent.horizontalCenter
+
+                    Behavior on color { ColorAnimation { duration: Theme.fastAnim } }
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "󰐥"
+                        color: root.shutdownHover ? Qt.rgba(0, 0, 0, 1) : Theme.text
+                        font.pixelSize: 28
+                        font.family: "JetBrainsMono Nerd Font"
+                        Behavior on color { ColorAnimation { duration: Theme.fastAnim } }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: cmdShutdown.running = true
+                        onEntered: root.shutdownHover = true
+                        onExited: root.shutdownHover = false
+                        cursorShape: Qt.PointingHandCursor
+                    }
+
+                    ToolTip.visible: root.shutdownHover
+                    ToolTip.text: "Shutdown"
+                    ToolTip.delay: 300
+                }
             }
+            ToolTip.visible: root.shutdownHover
+            ToolTip.text: "Shutdown"
+            ToolTip.delay: 300
         }
     }
+
+    // Hover state properties
+    property bool lockHover: false
+    property bool sleepHover: false
+    property bool logoutHover: false
+    property bool rebootHover: false
+    property bool shutdownHover: false
 }
