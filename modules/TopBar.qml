@@ -1,10 +1,14 @@
 import Quickshell
 import QtQuick
+import Quickshell.Wayland
 
 import "../widgets"
 import "../styles"
 
 PanelWindow {
+
+    WlrLayershell.layer: WlrLayer.Bottom
+
     anchors {
         top: true
         left: true

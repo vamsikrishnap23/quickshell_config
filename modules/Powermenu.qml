@@ -16,6 +16,43 @@ PanelWindow {
     Process { id: cmdLogout; command: ["hyprctl", "dispatch", "exit"] }
     Process { id: cmdLock; command: ["hyprlock"] }
     Process { id: cmdSleep; command: ["systemctl", "suspend"] }
+
+
+    // Timers
+    Timer {
+        id: lockTimer
+        interval: Theme.normalAnim
+        repeat: false
+        onTriggered: cmdLock.running = true
+    }
+
+    Timer {
+        id: sleepTimer
+        interval: Theme.normalAnim
+        repeat: false
+        onTriggered: cmdSleep.running = true
+    }
+
+    Timer {
+        id: logoutTimer
+        interval: Theme.normalAnim
+        repeat: false
+        onTriggered: cmdLogout.running = true
+    }
+
+    Timer {
+        id: rebootTimer
+        interval: Theme.normalAnim
+        repeat: false
+        onTriggered: cmdReboot.running = true
+    }
+
+    Timer {
+        id: shutdownTimer
+        interval: Theme.normalAnim
+        repeat: false
+        onTriggered: cmdShutdown.running = true
+    }
     
     // Force the window to cover the entire screen
     anchors {
@@ -66,13 +103,14 @@ PanelWindow {
         Rectangle {
             id: pillBackground
             width: 90
-            height: 390
+            implicitHeight: buttonColumn.implicitHeight + 30
             radius: 45
             color: Theme.background
             border.color: Theme.border
             border.width: 1
 
             Column {
+                id: buttonColumn
                 anchors.fill: parent
                 anchors.topMargin: 15
                 anchors.bottomMargin: 15
@@ -102,7 +140,10 @@ PanelWindow {
                     MouseArea {
                         anchors.fill: parent
                         hoverEnabled: true
-                        onClicked: cmdLock.running = true
+                        onClicked: {
+                            GlobalState.showPowermenu = false
+                            lockTimer.start()
+                        }
                         onEntered: root.lockHover = true
                         onExited: root.lockHover = false
                         cursorShape: Qt.PointingHandCursor
@@ -139,7 +180,10 @@ PanelWindow {
                     MouseArea {
                         anchors.fill: parent
                         hoverEnabled: true
-                        onClicked: cmdSleep.running = true
+                        onClicked: {
+                            GlobalState.showPowermenu = false
+                            sleepTimer.start()
+                        }
                         onEntered: root.sleepHover = true
                         onExited: root.sleepHover = false
                         cursorShape: Qt.PointingHandCursor
@@ -176,7 +220,10 @@ PanelWindow {
                     MouseArea {
                         anchors.fill: parent
                         hoverEnabled: true
-                        onClicked: cmdLogout.running = true
+                        onClicked: {
+                            GlobalState.showPowermenu = false
+                            logoutTimer.start()
+                        }
                         onEntered: root.logoutHover = true
                         onExited: root.logoutHover = false
                         cursorShape: Qt.PointingHandCursor
@@ -213,7 +260,10 @@ PanelWindow {
                     MouseArea {
                         anchors.fill: parent
                         hoverEnabled: true
-                        onClicked: cmdReboot.running = true
+                        onClicked: {
+                            GlobalState.showPowermenu = false
+                            rebootTimer.start()
+                        }
                         onEntered: root.rebootHover = true
                         onExited: root.rebootHover = false
                         cursorShape: Qt.PointingHandCursor
@@ -250,7 +300,10 @@ PanelWindow {
                     MouseArea {
                         anchors.fill: parent
                         hoverEnabled: true
-                        onClicked: cmdShutdown.running = true
+                        onClicked: {
+                            GlobalState.showPowermenu = false
+                            shutdownTimer.start()
+                        }
                         onEntered: root.shutdownHover = true
                         onExited: root.shutdownHover = false
                         cursorShape: Qt.PointingHandCursor
