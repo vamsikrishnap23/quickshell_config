@@ -75,7 +75,7 @@ PanelWindow {
             }
             MouseArea {
                 anchors.fill: parent
-                onClicked: cmdLogout.running = true1
+                onClicked: cmdLogout.running = true
             }
         }
     }
