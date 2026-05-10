@@ -23,7 +23,6 @@ PanelWindow {
     color: "transparent"
     visible: GlobalState.showWallpaperSwitcher
 
-    // --- State & Data ---
     readonly property string wallDir: "/home/vamsi/Pictures/Wallpapers/walls"
     property string selectedCategory: ""
     property string selectedTransition: "random"
@@ -35,7 +34,6 @@ PanelWindow {
     ListModel { id: categoryModel }
     ListModel { id: imageModel }
 
-    // --- Global Keyboard Shortcuts ---
     Shortcut {
         sequence: "Escape"
         onActivated: GlobalState.showWallpaperSwitcher = false
@@ -47,7 +45,6 @@ PanelWindow {
         onClicked: GlobalState.showWallpaperSwitcher = false
     }
 
-    // --- Processes to Fetch Data ---
     Process {
         id: loadCategoriesProcess
         command: ["sh", "-c", "find " + root.wallDir + " -mindepth 1 -maxdepth 1 -type d -exec basename {} \\; | sort"]
@@ -56,9 +53,7 @@ PanelWindow {
                 const cat = data.trim()
                 if (cat !== "") {
                     categoryModel.append({ name: cat })
-                    if (root.selectedCategory === "") {
-                        root.selectedCategory = cat
-                    }
+                    if (root.selectedCategory === "") root.selectedCategory = cat
                 }
             }
         }
@@ -79,7 +74,6 @@ PanelWindow {
 
     Process { id: swwwProcess }
 
-    // --- Matugen Color Generation Process ---
     Process {
         id: matugenProcess
         property string jsonBuffer: ""
@@ -93,16 +87,9 @@ PanelWindow {
         onExited: {
             try {
                 const parsed = JSON.parse(matugenProcess.jsonBuffer)
-                const colors = parsed.colors 
-                
-                Theme.background = colors.background.dark.color
-                Theme.surface = colors.surface_container_highest.dark.color
-                Theme.primary = colors.primary.dark.color
-                Theme.secondary = colors.secondary.dark.color
-                Theme.text = colors.on_background.dark.color
-                Theme.textDim = colors.on_surface_variant.dark.color
-                Theme.border = colors.outline_variant.dark.color
-                
+                // NEW: Just hand the entire color object to the Theme! 
+                // The declarative bindings in Theme.qml will do the rest instantly.
+                Theme.palette = parsed.colors 
             } catch (e) {
                 console.log("Matugen JSON Parse Error: " + e)
             }
@@ -114,7 +101,6 @@ PanelWindow {
         if (!imageName || swwwProcess.running) return;
 
         root.currentWallpaper = imageName;
-
         const fullPath = root.wallDir + "/" + root.selectedCategory + "/" + imageName
         let activeTransition = root.selectedTransition;
 
@@ -135,20 +121,15 @@ PanelWindow {
         ]
         matugenProcess.running = true
 
-        // NEW: Close the switcher automatically
         GlobalState.showWallpaperSwitcher = false
     }
 
-    // --- Lifecycle Hooks ---
     Connections {
         target: GlobalState
         function onShowWallpaperSwitcherChanged() {
             if (GlobalState.showWallpaperSwitcher) {
                 if (categoryModel.count === 0) loadCategoriesProcess.running = true;
-                
-                Qt.callLater(function() { 
-                    categoryList.forceActiveFocus(); 
-                });
+                Qt.callLater(function() { categoryList.forceActiveFocus(); });
             }
         }
     }
@@ -166,9 +147,7 @@ PanelWindow {
         }
     }
 
-    // --- Main UI Panel ---
     Rectangle {
-        // FIXED: Increased width to 1180 to give the buttons more room
         width: 1180
         height: 750
         anchors.centerIn: parent
@@ -184,7 +163,6 @@ PanelWindow {
             anchors.margins: 20
             spacing: 20
 
-            // LEFT PANE: Categories
             Rectangle {
                 width: 220
                 height: parent.height
@@ -208,26 +186,23 @@ PanelWindow {
                     Keys.onEnterPressed: imageGrid.forceActiveFocus()
 
                     onCurrentIndexChanged: {
-                        if (activeFocus && count > 0) {
-                            root.selectedCategory = model.get(currentIndex).name
-                        }
+                        if (activeFocus && count > 0) root.selectedCategory = model.get(currentIndex).name
                     }
 
                     delegate: Rectangle {
                         width: parent.width
                         height: 42
                         radius: 10
-                        
                         color: (root.selectedCategory === model.name || (categoryList.activeFocus && categoryList.currentIndex === index))
-                               ? Theme.primary 
-                               : (catHover.containsMouse ? Qt.rgba(1,1,1,0.06) : "transparent")
+                               ? Theme.primary : (catHover.containsMouse ? Qt.rgba(1,1,1,0.06) : "transparent")
 
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
                             anchors.left: parent.left
                             anchors.leftMargin: 16
                             text: model.name
-                            color: (root.selectedCategory === model.name || (categoryList.activeFocus && categoryList.currentIndex === index)) ? "#111111" : Theme.text
+                            // Changed #111111 to Theme.background so it inverts cleanly
+                            color: (root.selectedCategory === model.name || (categoryList.activeFocus && categoryList.currentIndex === index)) ? Theme.background : Theme.text
                             font.pixelSize: 14
                             font.bold: root.selectedCategory === model.name
                         }
@@ -247,7 +222,6 @@ PanelWindow {
                 }
             }
 
-            // RIGHT PANE: Images & Controls
             Item {
                 width: parent.width - 240
                 height: parent.height
@@ -299,7 +273,8 @@ PanelWindow {
                                     id: transText
                                     anchors.centerIn: parent
                                     text: modelData
-                                    color: root.selectedTransition === modelData ? "#111111" : Theme.textDim
+                                    // Changed #111111 to Theme.background
+                                    color: root.selectedTransition === modelData ? Theme.background : Theme.textDim
                                     font.pixelSize: 12
                                     font.bold: root.selectedTransition === modelData
                                 }
@@ -314,7 +289,6 @@ PanelWindow {
                     }
                 }
 
-                // GRID VIEW
                 GridView {
                     id: imageGrid
                     anchors.top: headerRow.bottom
@@ -322,7 +296,6 @@ PanelWindow {
                     anchors.bottom: parent.bottom
                     anchors.left: parent.left
                     anchors.right: parent.right
-
                     model: imageModel
                     cellWidth: 260
                     cellHeight: 180
@@ -335,7 +308,6 @@ PanelWindow {
                     }
 
                     Keys.onTabPressed: categoryList.forceActiveFocus()
-                    
                     Keys.onLeftPressed: (event) => {
                         let cols = Math.floor(width / cellWidth);
                         if (currentIndex % cols === 0) {
@@ -345,7 +317,6 @@ PanelWindow {
                             event.accepted = false; 
                         }
                     }
-
                     Keys.onReturnPressed: applyCurrent()
                     Keys.onEnterPressed: applyCurrent()
                     Keys.onSpacePressed: applyCurrent()
@@ -359,7 +330,6 @@ PanelWindow {
                     delegate: Item {
                         width: 240
                         height: 160
-                        
                         property bool isHighlighted: imgHover.containsMouse || (imageGrid.activeFocus && GridView.isCurrentItem)
                         z: isHighlighted ? 10 : 1
 
@@ -367,14 +337,11 @@ PanelWindow {
                             anchors.fill: parent
                             radius: 14
                             color: Theme.surface
-                            
                             scale: parent.isHighlighted ? 1.05 : 1.0
                             Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutQuad } }
                             
                             border.color: (root.currentWallpaper === model.fileName) 
-                                          ? Theme.secondary 
-                                          : (parent.isHighlighted ? Theme.primary : Theme.border)
-                            
+                                          ? Theme.secondary : (parent.isHighlighted ? Theme.primary : Theme.border)
                             border.width: (root.currentWallpaper === model.fileName || parent.isHighlighted) ? 3 : 1
                             Behavior on border.color { ColorAnimation { duration: 150 } }
 

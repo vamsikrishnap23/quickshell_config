@@ -59,7 +59,7 @@ Item {
         }
     }
 
-    // Right Side: Settings & Power Buttons
+    // Right Side: Settings, Light/Dark, & Power Buttons
     Row {
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
@@ -85,6 +85,34 @@ Item {
             MouseArea {
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
+            }
+        }
+
+        // NEW: Light/Dark Mode Toggle Button
+        Rectangle {
+            width: 36
+            height: 36
+            radius: 18
+            color: Theme.surface
+            border.color: Theme.border
+            border.width: 1
+
+            Text {
+                anchors.centerIn: parent
+                // 󰖔 = Moon (Dark mode active) | 󰖨 = Sun (Light mode active)
+                text: GlobalState.isDarkMode ? "󰖔" : "󰖨" 
+                color: Theme.text
+                font.pixelSize: 18
+                font.family: "JetBrainsMono Nerd Font"
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    // Instantly flips the entire UI!
+                    GlobalState.isDarkMode = !GlobalState.isDarkMode
+                }
             }
         }
 

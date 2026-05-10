@@ -1,26 +1,23 @@
 pragma Singleton
 import QtQuick
+import "../state"
 
 QtObject {
+    // Store the raw Matugen JSON object here
+    property var palette: null
 
     // =========================
-    // COLORS (DYNAMIC)
+    // COLORS (DYNAMIC BINDINGS)
     // =========================
 
-    // Main backgrounds
-    property color background: "#111111"
-    property color surface: "#1c1c1f"
-
-    // Accent colors
-    property color primary: "#cba6f7"
-    property color secondary: "#89b4fa"
-
-    // Text
-    property color text: "#ffffff"
-    property color textDim: "#a1a1aa"
-
-    // Borders
-    property color border: "#2a2a2e"
+    // Automatically switches between dark and light colors when isDarkMode changes!
+    property color background: palette ? palette.background[GlobalState.isDarkMode ? "dark" : "light"].color : "#111111"
+    property color surface: palette ? palette.surface_container_highest[GlobalState.isDarkMode ? "dark" : "light"].color : "#1c1c1f"
+    property color primary: palette ? palette.primary[GlobalState.isDarkMode ? "dark" : "light"].color : "#cba6f7"
+    property color secondary: palette ? palette.secondary[GlobalState.isDarkMode ? "dark" : "light"].color : "#89b4fa"
+    property color text: palette ? palette.on_background[GlobalState.isDarkMode ? "dark" : "light"].color : "#ffffff"
+    property color textDim: palette ? palette.on_surface_variant[GlobalState.isDarkMode ? "dark" : "light"].color : "#a1a1aa"
+    property color border: palette ? palette.outline_variant[GlobalState.isDarkMode ? "dark" : "light"].color : "#2a2a2e"
 
     // =========================
     // SIZING (STATIC)
