@@ -6,295 +6,319 @@ import Qt5Compat.GraphicalEffects
 import "../styles"
 
 Item {
-    id: mediaCard
-    width: parent.width
-    height: 165
+    id: root
+    width:  parent.width
+    height: 118
 
-    // Get the first playing player, or first available
-    property var currentPlayer: {
-        const players = Mpris.players.values || []
-        if (players.length === 0) return null
-        
-        let playing = players.find(p => p.playbackState === MprisPlaybackState.Playing)
-        return playing || players[0]
+    // ── Active player ─────────────────────────────────────────────────────
+    property var player: {
+        const list = Mpris.players.values || []
+        return list.find(p => p.playbackState === MprisPlaybackState.Playing)
+               ?? list[0]
+               ?? null
     }
 
-    property bool isPlaying: currentPlayer && currentPlayer.playbackState === MprisPlaybackState.Playing
-    property real displayPosition: currentPlayer ? currentPlayer.position : 0
-    property real displayLength: currentPlayer && currentPlayer.length > 0 ? currentPlayer.length : 1
-    property real breathingOpacity: 0.8
-    property bool breathingUp: true
+    property bool isPlaying: player?.playbackState === MprisPlaybackState.Playing
+                             ?? false
 
-    // Breathing animation with timer
-    Timer {
-        id: breathingTimer
-        interval: 2000
-        running: mediaCard.isPlaying
-        repeat: true
-        onTriggered: {
-            mediaCard.breathingUp = !mediaCard.breathingUp
+    // Quickshell exposes position / length in SECONDS (not microseconds)
+    property real length:   player?.length   ?? 0
+    property real position: 0                         // driven by animation below
+
+    property string artUrl: player?.metadata?.["mpris:artUrl"] ?? ""
+
+    // ── Smooth position interpolation — no polling ────────────────────────
+    //   Seeded from the player on every meaningful state change.
+    //   NumberAnimation advances at real-time pace (duration = remaining ms).
+
+    function syncPosition() {
+        posAnim.stop()
+        if (!player) { position = 0; return }
+        position = player.position
+        if (isPlaying && length > 0) {
+            const remaining = length - position
+            if (remaining > 0.5) {
+                posAnim.to       = length
+                posAnim.duration = Math.round(remaining * 1000)
+                posAnim.start()
+            }
         }
     }
 
-    // Auto-update position when playing
-    Timer {
-        interval: 500
-        running: mediaCard.isPlaying
-        repeat: true
-        onTriggered: {
-            mediaCard.displayPosition = mediaCard.currentPlayer ? mediaCard.currentPlayer.position : 0
-        }
+    NumberAnimation {
+        id:          posAnim
+        target:      root
+        property:    "position"
+        easing.type: Easing.Linear
+        running:     false
     }
 
-    function formatTime(microseconds) {
-        if (!microseconds || microseconds <= 0) return "0:00"
-        let totalSeconds = Math.floor(microseconds / 1000000)
-        let minutes = Math.floor(totalSeconds / 60)
-        let seconds = totalSeconds % 60
-        return minutes + ":" + (seconds < 10 ? "0" : "") + seconds
+    // React to state changes without a polling timer
+    onPlayerChanged:    syncPosition()
+    onIsPlayingChanged: syncPosition()
+    onLengthChanged:    syncPosition()
+
+    Connections {
+        target:  root.player
+        enabled: root.player !== null
+        function onPositionChanged()     { root.syncPosition() }  // seek
+        function onPlaybackStateChanged(){ root.syncPosition() }  // external pause/play
     }
 
+    // ── Helpers ───────────────────────────────────────────────────────────
+    function formatTime(secs) {
+        if (!secs || secs <= 0) return "0:00"
+        const s = Math.floor(secs)
+        const m = Math.floor(s / 60)
+        const r = s % 60
+        return `${m}:${r < 10 ? "0" : ""}${r}`
+    }
+
+    // ── Card ──────────────────────────────────────────────────────────────
     Rectangle {
         anchors.fill: parent
-        radius: 32
-        color: Theme.surface
+        radius:       20
+        color:        Theme.surface
         border.color: Theme.border
         border.width: 1
-        clip: true
+        clip:         true
 
-        Column {
+        // Blurred album-art backdrop
+        Image {
+            id:           bgArt
             anchors.fill: parent
-            anchors.margins: 14
-            spacing: 10
+            source:       root.artUrl
+            fillMode:     Image.PreserveAspectCrop
+            asynchronous: true
+            cache:        false
+            visible:      status === Image.Ready
+            opacity:      0.15
+        }
+        FastBlur {
+            anchors.fill: bgArt
+            source:       bgArt
+            radius:       90
+            visible:      bgArt.visible
+        }
+        Rectangle {
+            anchors.fill: parent
+            color:        "#A0000000"
+        }
 
-            // HEADER: Album Art + Track Info
-            Row {
-                width: parent.width
-                spacing: 12
-                height: 90
+        // ── TOP ROW: art · info · play button ────────────────────────────
+        Item {
+            id:      topRow
+            anchors { top: parent.top; left: parent.left; right: parent.right; margins: 14 }
+            height:  76
 
-                // Album Art
-                Rectangle {
-                    width: 90
-                    height: 90
-                    radius: 10
-                    color: Theme.background
-                    border.color: Theme.border
-                    border.width: 1
-                    clip: true
+            // Album art
+            Rectangle {
+                id:     artBox
+                width:  68; height: 68
+                radius: 12
+                color:  Qt.rgba(1, 1, 1, 0.07)
+                clip:   true
+                anchors.verticalCenter: parent.verticalCenter
 
-                    Image {
-                        id: albumArt
-                        anchors.fill: parent
-                        source: {
-                            if (mediaCard.currentPlayer && mediaCard.currentPlayer.metadata) {
-                                let url = mediaCard.currentPlayer.metadata["mpris:artUrl"]
-                                return url || ""
-                            }
-                            return ""
-                        }
-                        fillMode: Image.PreserveAspectCrop
-                        visible: status === Image.Ready
-                        asynchronous: true
-                        cache: false
-                        opacity: mediaCard.breathingOpacity
-                        Behavior on opacity {
-                            NumberAnimation { 
-                                duration: 2000
-                                easing.type: Easing.InOutSine
-                            }
-                        }
-                    }
-
-                    // Breathing opacity animation
-                    PropertyAnimation {
-                        target: mediaCard
-                        property: "breathingOpacity"
-                        from: mediaCard.breathingUp ? 0.8 : 1.0
-                        to: mediaCard.breathingUp ? 1.0 : 0.8
-                        duration: 2000
-                        easing.type: Easing.InOutSine
-                        running: mediaCard.isPlaying
-                    }
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "󰎆"
-                        color: Theme.primary
-                        font.pixelSize: 36
-                        font.family: "JetBrainsMono Nerd Font"
-                        visible: !albumArt.visible
-                    }
+                Image {
+                    id:           albumArt
+                    anchors.fill: parent
+                    source:       root.artUrl
+                    fillMode:     Image.PreserveAspectCrop
+                    asynchronous: true
+                    cache:        false
+                    visible:      status === Image.Ready
                 }
 
-                // Track Info
-                Column {
-                    width: parent.width - 90 - 12
-                    height: parent.height
-                    spacing: 4
-                    anchors.verticalCenter: parent.verticalCenter
-
-                    // Title
-                    Text {
-                        text: mediaCard.currentPlayer && mediaCard.currentPlayer.trackTitle 
-                            ? mediaCard.currentPlayer.trackTitle 
-                            : "No Media Playing"
-                        color: Theme.text
-                        font.pixelSize: 13
-                        font.bold: true
-                        width: parent.width
-                        elide: Text.ElideRight
-                        maximumLineCount: 2
-                    }
-
-                    // Artist
-                    Text {
-                        text: mediaCard.currentPlayer && mediaCard.currentPlayer.trackArtist 
-                            ? mediaCard.currentPlayer.trackArtist 
-                            : ""
-                        color: Theme.textDim
-                        font.pixelSize: 10
-                        width: parent.width
-                        elide: Text.ElideRight
-                        visible: text !== ""
-                    }
-
-                    // Time Display
-                    Text {
-                        text: mediaCard.formatTime(mediaCard.displayPosition) + " / " + mediaCard.formatTime(mediaCard.displayLength)
-                        color: Theme.textDim
-                        font.pixelSize: 9
-                        font.family: "JetBrainsMono Nerd Font"
-                    }
+                Text {
+                    anchors.centerIn: parent
+                    visible:          !albumArt.visible
+                    text:             "󰎆"
+                    color:            Theme.textDim
+                    font.pixelSize:   28
+                    font.family:      "JetBrainsMono Nerd Font"
                 }
             }
 
-            // Timeline
+            // Track info
+            Column {
+                anchors {
+                    left:           artBox.right;  leftMargin:     12
+                    right:          playBtn.left;  rightMargin:    12
+                    verticalCenter: parent.verticalCenter
+                }
+                spacing: 4
+
+                Text {
+                    width:          parent.width
+                    text:           root.player?.trackTitle ?? "Nothing Playing"
+                    color:          Theme.text
+                    font.pixelSize: 15
+                    font.bold:      true
+                    elide:          Text.ElideRight
+                }
+
+                Text {
+                    width:          parent.width
+                    text:           root.player?.trackArtist ?? ""
+                    color:          Theme.textDim
+                    font.pixelSize: 12
+                    elide:          Text.ElideRight
+                    visible:        text !== ""
+                }
+
+                // Time — only rendered when a real duration is known
+                Text {
+                    visible:        root.player !== null && root.length > 0
+                    text:           root.formatTime(root.position) + " / "
+                                    + root.formatTime(root.length)
+                    color:          Theme.textDim
+                    font.pixelSize: 11
+                    font.family:    "JetBrainsMono Nerd Font"
+                }
+            }
+
+            // Circular play / pause button
             Rectangle {
-                width: parent.width
-                height: 6
-                radius: 3
-                color: Theme.background
-                border.color: Theme.border
-                border.width: 1
+                id:     playBtn
+                width:  40; height: 40
+                radius: 20
+                anchors { right: parent.right; verticalCenter: parent.verticalCenter }
+                color: playHover.containsMouse
+                       ? Qt.lighter(Theme.primary, 1.12) : Theme.primary
+                Behavior on color { ColorAnimation { duration: 100 } }
 
-                Rectangle {
-                    height: parent.height
-                    radius: 3
-                    color: Theme.primary
-                    width: {
-                        if (mediaCard.displayLength <= 0) return 0
-                        let pct = mediaCard.displayPosition / mediaCard.displayLength
-                        return Math.max(0, Math.min(1, pct)) * parent.width
-                    }
-
-                    Behavior on width {
-                        NumberAnimation {
-                            duration: 300
-                            easing.type: Easing.Linear
-                        }
-                    }
+                Text {
+                    anchors.centerIn: parent
+                    text:           root.isPlaying ? "󰏤" : "󰐊"
+                    color:          "#111111"
+                    font.pixelSize: 18
+                    font.family:    "JetBrainsMono Nerd Font"
                 }
 
                 MouseArea {
+                    id:           playHover
                     anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: {
-                        if (mediaCard.currentPlayer && mediaCard.displayLength > 0) {
-                            let pct = Math.max(0, Math.min(1, mouse.x / width))
-                            let newPos = pct * mediaCard.displayLength
-                            mediaCard.currentPlayer.position = Math.floor(newPos)
-                        }
-                    }
+                    hoverEnabled: true
+                    cursorShape:  Qt.PointingHandCursor
+                    onClicked:    if (root.player) root.player.togglePlaying()
+                }
+            }
+        }
+
+        // ── BOTTOM ROW: prev · progress pill · next ───────────────────────
+        Item {
+            anchors {
+                top:          topRow.bottom; topMargin:    4
+                bottom:       parent.bottom; bottomMargin: 12
+                left:         parent.left;   leftMargin:   14
+                right:        parent.right;  rightMargin:  14
+            }
+
+            // Previous button
+            Rectangle {
+                id:     prevBtn
+                width:  36; height: 36
+                radius: 10
+                anchors { left: parent.left; verticalCenter: parent.verticalCenter }
+                color: prevHover.containsMouse ? Qt.rgba(1,1,1,0.10) : "transparent"
+                Behavior on color { ColorAnimation { duration: 100 } }
+
+                Text {
+                    anchors.centerIn: parent
+                    text:           "󰒮"
+                    color:          prevHover.containsMouse ? Theme.text : Theme.textDim
+                    font.pixelSize: 18
+                    font.family:    "JetBrainsMono Nerd Font"
+                    Behavior on color { ColorAnimation { duration: 100 } }
+                }
+
+                MouseArea {
+                    id:           prevHover
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape:  Qt.PointingHandCursor
+                    onClicked:    if (root.player) root.player.previous()
                 }
             }
 
-            // Controls
-            Row {
-                width: parent.width
-                spacing: 6
-                height: 40
+            // Next button
+            Rectangle {
+                id:     nextBtn
+                width:  36; height: 36
+                radius: 10
+                anchors { right: parent.right; verticalCenter: parent.verticalCenter }
+                color: nextHover.containsMouse ? Qt.rgba(1,1,1,0.10) : "transparent"
+                Behavior on color { ColorAnimation { duration: 100 } }
 
-                // Previous
+                Text {
+                    anchors.centerIn: parent
+                    text:           "󰒭"
+                    color:          nextHover.containsMouse ? Theme.text : Theme.textDim
+                    font.pixelSize: 18
+                    font.family:    "JetBrainsMono Nerd Font"
+                    Behavior on color { ColorAnimation { duration: 100 } }
+                }
+
+                MouseArea {
+                    id:           nextHover
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape:  Qt.PointingHandCursor
+                    onClicked:    if (root.player) root.player.next()
+                }
+            }
+
+            // Smooth pill progress bar
+            Item {
+                anchors {
+                    left:           prevBtn.right; leftMargin:  8
+                    right:          nextBtn.left;  rightMargin: 8
+                    verticalCenter: parent.verticalCenter
+                }
+                height: 20
+
+                // Track background
                 Rectangle {
-                    width: (parent.width - 16) / 3
-                    height: parent.height
-                    radius: 10
-                    color: (mediaCard.currentPlayer && mediaCard.currentPlayer.canGoPrevious) ? Theme.primary : Theme.surface
-                    border.color: Theme.border
-                    border.width: 1
+                    id:      progressTrack
+                    width:   parent.width
+                    height:  5
+                    radius:  3
+                    color:   Qt.rgba(1, 1, 1, 0.13)
+                    anchors.verticalCenter: parent.verticalCenter
 
-                    Text {
-                        anchors.centerIn: parent
-                        text: "󰒮"
-                        color: (mediaCard.currentPlayer && mediaCard.currentPlayer.canGoPrevious) ? "#111111" : Theme.textDim
-                        font.pixelSize: 18
-                        font.family: "JetBrainsMono Nerd Font"
+                    // Played fill
+                    Rectangle {
+                        height: parent.height
+                        radius: parent.radius
+                        color:  Theme.primary
+                        width:  root.length > 0
+                                ? (root.position / root.length) * parent.width
+                                : 0
                     }
 
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: (mediaCard.currentPlayer && mediaCard.currentPlayer.canGoPrevious) ? Qt.PointingHandCursor : Qt.ArrowCursor
-                        onClicked: {
-                            if (mediaCard.currentPlayer && mediaCard.currentPlayer.canGoPrevious) {
-                                mediaCard.currentPlayer.previous()
-                            }
-                        }
+                    // Playhead dot
+                    Rectangle {
+                        visible: root.player !== null
+                        width:   10; height: 10
+                        radius:  5
+                        color:   Theme.primary
+                        anchors.verticalCenter: parent.verticalCenter
+                        x: root.length > 0
+                           ? Math.max(0, (root.position / root.length) * parent.width - 5)
+                           : -5
                     }
                 }
 
-                // Play/Pause
-                Rectangle {
-                    width: (parent.width - 16) / 3
-                    height: parent.height
-                    radius: 10
-                    color: (mediaCard.currentPlayer && mediaCard.currentPlayer.canTogglePlaying) ? Theme.primary : Theme.surface
-                    border.color: Theme.border
-                    border.width: 1
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: mediaCard.isPlaying ? "󰏤" : "󰐊"
-                        color: (mediaCard.currentPlayer && mediaCard.currentPlayer.canTogglePlaying) ? "#111111" : Theme.textDim
-                        font.pixelSize: 20
-                        font.family: "JetBrainsMono Nerd Font"
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: (mediaCard.currentPlayer && mediaCard.currentPlayer.canTogglePlaying) ? Qt.PointingHandCursor : Qt.ArrowCursor
-                        onClicked: {
-                            if (mediaCard.currentPlayer && mediaCard.currentPlayer.canTogglePlaying) {
-                                mediaCard.currentPlayer.togglePlaying()
-                            }
-                        }
-                    }
-                }
-
-                // Next
-                Rectangle {
-                    width: (parent.width - 16) / 3
-                    height: parent.height
-                    radius: 10
-                    color: (mediaCard.currentPlayer && mediaCard.currentPlayer.canGoNext) ? Theme.primary : Theme.surface
-                    border.color: Theme.border
-                    border.width: 1
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "󰒭"
-                        color: (mediaCard.currentPlayer && mediaCard.currentPlayer.canGoNext) ? "#111111" : Theme.textDim
-                        font.pixelSize: 18
-                        font.family: "JetBrainsMono Nerd Font"
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: (mediaCard.currentPlayer && mediaCard.currentPlayer.canGoNext) ? Qt.PointingHandCursor : Qt.ArrowCursor
-                        onClicked: {
-                            if (mediaCard.currentPlayer && mediaCard.currentPlayer.canGoNext) {
-                                mediaCard.currentPlayer.next()
-                            }
+                // Wider invisible hit area for easy seeking
+                MouseArea {
+                    anchors.fill: parent
+                    cursorShape:  Qt.PointingHandCursor
+                    onClicked: {
+                        if (root.player && root.length > 0) {
+                            const pct = Math.max(0, Math.min(1, mouse.x / width))
+                            root.player.position = pct * root.length
+                            root.syncPosition()
                         }
                     }
                 }
