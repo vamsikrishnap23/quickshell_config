@@ -8,6 +8,7 @@ import Quickshell.Bluetooth
 
 import "../styles"
 import "../components"
+import "../state"
 
 Row {
     id: root
@@ -20,6 +21,8 @@ Row {
     property bool applyingBluetoothSnap: false
     property bool notificationsPresent: false
     property bool notificationsDnd: false
+
+    
 
     function normalizedPercent(raw) {
         if (raw === undefined || raw === null) {
@@ -265,78 +268,48 @@ Row {
     // ==========================================
     // 1. WIFI (Declarative Watcher)
     // ==========================================
+    // ==========================================
+    // 1. WIFI (Event-Driven & Optimized)
+    // ==========================================
     property string wifiLabel: "󰤭  Offline"
 
     Instantiator {
         model: Networking.devices
+        
         delegate: Instantiator {
+            // Filter strictly for Wi-Fi devices to save processing
             active: modelData.type === DeviceType.Wifi
             model: active ? modelData.networks : null
-            delegate: Item {
+            
+            // QtObject is purely logical. Zero visual overhead, zero polling!
+            delegate: QtObject {
+                id: netWatcher
+                
+                // 1. Reactive bindings: These update automatically without timers
                 property bool isConnected: modelData.connected
                 property string netName: modelData.name
                 property int signalPct: root.normalizedPercent(
-                    modelData.strength !== undefined
-                        ? modelData.strength
-                        : (modelData.signalStrength !== undefined
-                            ? modelData.signalStrength
-                            : (modelData.signal !== undefined ? modelData.signal : 100))
+                    modelData.strength !== undefined ? modelData.strength :
+                    (modelData.signalStrength !== undefined ? modelData.signalStrength :
+                    (modelData.signal !== undefined ? modelData.signal : 100))
                 )
 
-                width: 0
-                height: 0
-                visible: false
-
-                onIsConnectedChanged: {
+                // 2. State synchronization function
+                function syncState() {
                     if (isConnected) {
                         root.wifiLabel = `${root.wifiIconForPercent(signalPct)}  ${netName || "WiFi"}`
                     } else if (root.wifiLabel.endsWith(`  ${netName || "WiFi"}`)) {
+                        // Only set to offline if THIS network was the one previously connected
                         root.wifiLabel = "󰤭  Offline"
                     }
                 }
 
-                onNetNameChanged: {
-                    if (isConnected) {
-                        root.wifiLabel = `${root.wifiIconForPercent(signalPct)}  ${netName || "WiFi"}`
-                    }
-                }
+                // 3. Signal listeners trigger updates instantly, only when needed
+                onIsConnectedChanged: syncState()
+                onNetNameChanged: syncState()
+                onSignalPctChanged: syncState()
 
-                onSignalPctChanged: {
-                    if (isConnected) {
-                        root.wifiLabel = `${root.wifiIconForPercent(signalPct)}  ${netName || "WiFi"}`
-                    }
-                }
-
-                Connections {
-                    target: modelData
-                    ignoreUnknownSignals: true
-
-                    function onConnectedChanged() {
-                        isConnected = modelData.connected
-                    }
-
-                    function onNameChanged() {
-                        netName = modelData.name
-                    }
-
-                    function onStrengthChanged() {
-                        signalPct = root.normalizedPercent(modelData.strength)
-                    }
-
-                    function onSignalStrengthChanged() {
-                        signalPct = root.normalizedPercent(modelData.signalStrength)
-                    }
-
-                    function onSignalChanged() {
-                        signalPct = root.normalizedPercent(modelData.signal)
-                    }
-                }
-
-                Component.onCompleted: {
-                    if (isConnected) {
-                        root.wifiLabel = `${root.wifiIconForPercent(signalPct)}  ${netName || "WiFi"}`
-                    }
-                }
+                Component.onCompleted: syncState()
             }
         }
     }
@@ -401,6 +374,24 @@ Row {
 
     Pill {
         implicitWidth: 32
+        
+        Text {
+            anchors.centerIn: parent
+            text: ""
+            color: Theme.text
+            font.pixelSize: 14
+            font.family: "JetBrainsMono Nerd Font"
+        }
+        
+        MouseArea {
+            anchors.fill: parent
+            cursorShape: Qt.PointingHandCursor
+            onClicked: GlobalState.showControlCenter = !GlobalState.showControlCenter
+        }
+    }
+
+    Pill {
+        implicitWidth: 32
         Text {
             anchors.centerIn: parent
             text: root.notificationIconForState(root.notificationsPresent, root.notificationsDnd)
@@ -409,4 +400,8 @@ Row {
             font.family: "JetBrainsMono Nerd Font"
         }
     }
+
+    
+
+    
 }

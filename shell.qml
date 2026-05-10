@@ -8,6 +8,7 @@ import "./state"
 ShellRoot {
     TopBar {}
     Powermenu {}
+    ControlCenter{}
 
     IpcHandler {
         target: "powermenu"

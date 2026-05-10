@@ -66,16 +66,17 @@ PanelWindow {
     // Listen to our global state
     visible: GlobalState.showPowermenu
 
-    // Handle Escape key to close menu
-    Keys.onEscapePressed: {
-        GlobalState.showPowermenu = false
-    }
-
-    // Clicking anywhere in the background closes the menu
+    // Clicking anywhere in the background OR pressing Escape closes the menu
     MouseArea {
         anchors.fill: parent
         onClicked: GlobalState.showPowermenu = false
+        
+        focus: true
+        Keys.onEscapePressed: {
+            GlobalState.showPowermenu = false
+        }
     }
+
 
     Column {
         id: menuContainer
