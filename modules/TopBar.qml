@@ -2,6 +2,7 @@ import Quickshell
 import QtQuick
 
 import "../widgets"
+import "../styles"
 
 PanelWindow {
     anchors {
@@ -12,7 +13,7 @@ PanelWindow {
 
     color: "transparent"
 
-    implicitHeight: 48
+    implicitHeight: Theme.barHeight
 
     LeftSection {
         anchors {
