@@ -1,30 +1,29 @@
 pragma Singleton
-
 import QtQuick
 
 QtObject {
 
     // =========================
-    // COLORS
+    // COLORS (DYNAMIC)
     // =========================
 
     // Main backgrounds
-    readonly property color background: "#111111"
-    readonly property color surface: "#1c1c1f"
+    property color background: "#111111"
+    property color surface: "#1c1c1f"
 
     // Accent colors
-    readonly property color primary: "#cba6f7"
-    readonly property color secondary: "#89b4fa"
+    property color primary: "#cba6f7"
+    property color secondary: "#89b4fa"
 
     // Text
-    readonly property color text: "#ffffff"
-    readonly property color textDim: "#a1a1aa"
+    property color text: "#ffffff"
+    property color textDim: "#a1a1aa"
 
     // Borders
-    readonly property color border: "#2a2a2e"
+    property color border: "#2a2a2e"
 
     // =========================
-    // SIZING
+    // SIZING (STATIC)
     // =========================
 
     readonly property int radius: 18

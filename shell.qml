@@ -9,6 +9,7 @@ ShellRoot {
     TopBar {}
     Powermenu {}
     ControlCenter{}
+    WallpaperSwitcher {}
 
     IpcHandler {
         target: "powermenu"
@@ -23,6 +24,13 @@ ShellRoot {
 
         function toggleControlCenter() {
             GlobalState.showControlCenter = !GlobalState.showControlCenter
+        }
+    }
+
+    IpcHandler {
+        target: "wallpaper"
+        function toggle() {
+            GlobalState.showWallpaperSwitcher = !GlobalState.showWallpaperSwitcher
         }
     }
 }
