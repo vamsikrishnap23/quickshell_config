@@ -17,4 +17,12 @@ ShellRoot {
             GlobalState.showPowermenu = !GlobalState.showPowermenu
         }
     }
+
+    IpcHandler {
+        target: "controlcenter"
+
+        function toggleControlCenter() {
+            GlobalState.showControlCenter = !GlobalState.showControlCenter
+        }
+    }
 }
