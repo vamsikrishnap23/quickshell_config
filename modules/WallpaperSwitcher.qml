@@ -112,7 +112,7 @@ PanelWindow {
         
         swwwProcess.command = [
             "sh", "-c", 
-            "awww img '" + fullPath + "' --transition-type " + activeTransition + " --transition-pos 0.5,0.5 --transition-fps 144 --transition-step 30"
+            "awww img '" + fullPath + "' --transition-type " + activeTransition + " --transition-pos 0.5,0.5 --transition-fps 144 --transition-step 30 && ln -sf '" + fullPath + "' ~/.config/hypr/current_wallpaper.jpg"
         ]
         swwwProcess.running = true
         
